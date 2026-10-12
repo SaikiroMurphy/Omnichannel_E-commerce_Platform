@@ -241,7 +241,7 @@ services:
 
   # -------------------- API GATEWAY --------------------
 
-  api-gateway:
+  gateway:
     <<: *app-defaults
     image: ${IMAGE_PREFIX:-ghcr.io/saikiromurphy/omnichannel_e-commerce_platform}-gateway:${IMAGE_TAG:-latest}
     ports:
