@@ -1,0 +1,108 @@
+name: Billing Service CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "billing-service/**"
+      - ".github/workflows/billing-service-ci-cd.yml"
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "billing-service/**"
+      - ".github/workflows/billing-service-ci-cd.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and Test Billing Service
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: billing-service
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: billing-service/pom.xml
+
+      - name: Build and test with Maven
+        run: mvn --batch-mode --no-transfer-progress clean verify
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: billing-service-jar
+          path: billing-service/target/*.jar
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-image:
+    name: Build and Publish Docker Image
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Normalize Docker image name
+        id: image
+        shell: bash
+        run: echo "name=${GITHUB_REPOSITORY,,}-billing-service" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR with retry
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            echo "GHCR login attempt ${attempt}/5"
+
+            if printf '%s' "$GHCR_TOKEN" | docker login ghcr.io \
+              --username "$GITHUB_ACTOR" \
+              --password-stdin; then
+              echo "Successfully logged in to GHCR"
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 5 ]; then
+              echo "Login failed; retrying in $((attempt * 5)) seconds..."
+              sleep $((attempt * 5))
+            fi
+          done
+
+          echo "Unable to log in to GHCR after 5 attempts"
+          exit 1
+
+      - name: Build and push Billing Service image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./billing-service
+          file: ./billing-service/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.image.outputs.name }}:latest
+            ghcr.io/${{ steps.image.outputs.name }}:${{ github.sha }}
