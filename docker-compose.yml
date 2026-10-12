@@ -207,13 +207,28 @@ services:
       DB_URL: jdbc:postgresql://order-db:5432/order_db
       DB_USERNAME: postgres
       DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      JWT_ISSUER_URI: ${JWT_ISSUER_URI:-http://user-service:8080}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-quickbite-api}
+      JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:-}
+      PRODUCT_SERVICE_URL: http://product-service:8080
+      INVENTORY_SERVICE_URL: http://inventory-service:8080
+      PAYMENT_SERVICE_URL: http://payment-service:8080
+      NOTIFICATION_SERVICE_URL: http://notification-service:8080
     ports:
       - "8083:8080"
     depends_on:
       order-db:
         condition: service_healthy
+      product-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/actuator/health"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/actuator/health"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -231,13 +246,20 @@ services:
       DB_URL: jdbc:postgresql://inventory-db:5432/inventory_db
       DB_USERNAME: postgres
       DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      JWT_ISSUER_URI: ${JWT_ISSUER_URI:-http://user-service:8080}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-quickbite-api}
+      JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:-}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     ports:
       - "8084:8080"
     depends_on:
       inventory-db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/actuator/health"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/actuator/health"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -258,6 +280,7 @@ services:
       JWT_ISSUER_URI: ${JWT_ISSUER_URI:-http://user-service:8080}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-quickbite-api}
       JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:-}
+      ORDER_SERVICE_URL: http://order-service:8080
       PAYMENT_MOCK_ENABLED: ${PAYMENT_MOCK_ENABLED:-true}
     ports:
       - "8085:8080"
@@ -310,10 +333,17 @@ services:
       DB_URL: jdbc:postgresql://notification-db:5432/notification_db
       DB_USERNAME: postgres
       DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      JWT_ISSUER_URI: ${JWT_ISSUER_URI:-http://user-service:8080}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-quickbite-api}
+      JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:-}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     ports:
       - "8086:8080"
     depends_on:
       notification-db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/actuator/health"]

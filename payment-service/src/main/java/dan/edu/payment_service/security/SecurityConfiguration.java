@@ -5,6 +5,8 @@ import java.util.List;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import com.nimbusds.jose.proc.SecurityContext;
 import dan.edu.payment_service.common.JwtSecret;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -19,8 +21,10 @@ import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -32,6 +36,11 @@ public class SecurityConfiguration {
 	@Bean
 	SecretKey paymentJwtSecretKey(@Value("${payment.jwt.secret-base64:}") String secretBase64) {
 		return new SecretKeySpec(JwtSecret.decode(secretBase64), "HmacSHA256");
+	}
+
+	@Bean
+	JwtEncoder paymentJwtEncoder(SecretKey paymentJwtSecretKey) {
+		return new NimbusJwtEncoder(new ImmutableSecret<SecurityContext>(paymentJwtSecretKey.getEncoded()));
 	}
 
 	@Bean

@@ -9,5 +9,4 @@ class InventoryServiceApplicationTests {
 	@Test
 	void contextLoads() {
 	}
-
 }

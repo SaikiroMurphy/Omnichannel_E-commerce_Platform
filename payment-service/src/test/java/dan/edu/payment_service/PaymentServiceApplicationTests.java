@@ -3,6 +3,7 @@ package dan.edu.payment_service;
 import java.util.UUID;
 
 import dan.edu.payment_service.repository.PaymentRepository;
+import dan.edu.payment_service.service.OrderPaymentEventPublisher;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,8 +14,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -48,6 +52,9 @@ class PaymentServiceApplicationTests {
 	@Autowired
 	private ObjectMapper objectMapper;
 
+	@MockitoBean
+	private OrderPaymentEventPublisher orderPaymentEventPublisher;
+
 	@BeforeEach
 	void clearPayments() {
 		paymentRepository.deleteAll();
@@ -63,8 +70,8 @@ class PaymentServiceApplicationTests {
 	void createsPendingPaymentAndMakesCreateIdempotent() throws Exception {
 		String body = createRequest(ORDER_ID, "125000.00", "request-1");
 
-		MvcResult first = mockMvc.perform(post("/api/payments")
-						.with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+		MvcResult first = mockMvc.perform(post("/api/payments/internal")
+						.with(orderServiceJwt())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body))
 				.andExpect(status().isCreated())
@@ -74,8 +81,8 @@ class PaymentServiceApplicationTests {
 				.andReturn();
 
 		String firstId = responseId(first);
-		mockMvc.perform(post("/api/payments")
-						.with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+		mockMvc.perform(post("/api/payments/internal")
+						.with(orderServiceJwt())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body))
 				.andExpect(status().isCreated())
@@ -86,14 +93,14 @@ class PaymentServiceApplicationTests {
 
 	@Test
 	void rejectsReusingAnIdempotencyKeyForDifferentPaymentData() throws Exception {
-		mockMvc.perform(post("/api/payments")
-						.with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+		mockMvc.perform(post("/api/payments/internal")
+						.with(orderServiceJwt())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(createRequest(ORDER_ID, "125000.00", "request-2")))
 				.andExpect(status().isCreated());
 
-		mockMvc.perform(post("/api/payments")
-						.with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+		mockMvc.perform(post("/api/payments/internal")
+						.with(orderServiceJwt())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(createRequest(ORDER_ID, "125001.00", "request-2")))
 				.andExpect(status().isConflict());
@@ -109,6 +116,9 @@ class PaymentServiceApplicationTests {
 						.content("{\"outcome\":\"APPROVED\"}"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("SUCCEEDED"));
+		verify(orderPaymentEventPublisher).publish(
+				org.mockito.ArgumentMatchers.argThat(payment -> payment.status().name().equals("SUCCEEDED")),
+				eq(USER_ID));
 
 		mockMvc.perform(post("/api/payments/{paymentId}/refund", paymentId)
 						.with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
@@ -157,11 +167,17 @@ class PaymentServiceApplicationTests {
 
 	@Test
 	void validatesPaymentAmountAndCapsPageSize() throws Exception {
-		mockMvc.perform(post("/api/payments")
-						.with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+		mockMvc.perform(post("/api/payments/internal")
+						.with(orderServiceJwt())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(createRequest(ORDER_ID, "0.00", "request-6")))
 				.andExpect(status().isBadRequest());
+
+		mockMvc.perform(post("/api/payments")
+						.with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(createRequest(ORDER_ID, "125000.00", "request-7")))
+				.andExpect(status().isMethodNotAllowed());
 
 		mockMvc.perform(get("/api/payments?size=101")
 						.with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
@@ -169,8 +185,8 @@ class PaymentServiceApplicationTests {
 	}
 
 	private String createPayment(String idempotencyKey) throws Exception {
-		MvcResult result = mockMvc.perform(post("/api/payments")
-						.with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+		MvcResult result = mockMvc.perform(post("/api/payments/internal")
+						.with(orderServiceJwt())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(createRequest(ORDER_ID, "125000.00", idempotencyKey)))
 				.andExpect(status().isCreated())
@@ -185,7 +201,12 @@ class PaymentServiceApplicationTests {
 
 	private static String createRequest(UUID orderId, String amount, String idempotencyKey) {
 		return """
-				{"orderId":"%s","amount":%s,"currency":"vnd","method":"CARD","idempotencyKey":"%s"}
-				""".formatted(orderId, amount, idempotencyKey);
+				{"userId":"%s","orderId":"%s","amount":%s,"currency":"vnd","method":"CARD","idempotencyKey":"%s"}
+				""".formatted(USER_ID, orderId, amount, idempotencyKey);
+	}
+
+	private static org.springframework.test.web.servlet.request.RequestPostProcessor orderServiceJwt() {
+		return jwt().jwt(token -> token.subject("order-service"))
+				.authorities(() -> "ROLE_SERVICE");
 	}
 }

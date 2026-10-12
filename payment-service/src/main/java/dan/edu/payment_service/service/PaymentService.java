@@ -88,6 +88,12 @@ public class PaymentService {
 	}
 
 	@Transactional
+	public void cancelForOrder(UUID userId, UUID orderId) {
+		paymentRepository.findByOrderIdAndUserIdForUpdate(orderId, userId)
+				.ifPresent(Payment::cancel);
+	}
+
+	@Transactional
 	public PaymentResponse refund(UUID paymentId) {
 		Payment payment = paymentRepository.findByIdForUpdate(paymentId)
 				.orElseThrow(() -> new ResourceNotFoundException("Payment not found"));

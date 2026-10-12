@@ -29,4 +29,10 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
 	Page<Payment> findAllByUserId(UUID userId, Pageable pageable);
 
 	Optional<Payment> findByOrderIdAndUserId(UUID orderId, UUID userId);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select payment from Payment payment where payment.orderId = :orderId and payment.userId = :userId")
+	Optional<Payment> findByOrderIdAndUserIdForUpdate(
+			@Param("orderId") UUID orderId,
+			@Param("userId") UUID userId);
 }
