@@ -20,6 +20,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
 
 	Optional<InventoryItem> findBySkuIgnoreCase(String sku);
 
+	Optional<InventoryItem> findByProductId(UUID productId);
+
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select item from InventoryItem item where lower(item.sku) = lower(:sku)")
 	Optional<InventoryItem> findBySkuForUpdate(@Param("sku") String sku);

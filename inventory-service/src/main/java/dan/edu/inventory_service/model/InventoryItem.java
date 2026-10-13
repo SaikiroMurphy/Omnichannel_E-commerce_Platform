@@ -21,7 +21,10 @@ import jakarta.persistence.Version;
 
 @Entity
 @Table(name = "inventory_items",
-		uniqueConstraints = @UniqueConstraint(name = "uk_inventory_items_sku", columnNames = "sku"),
+		uniqueConstraints = {
+				@UniqueConstraint(name = "uk_inventory_items_sku", columnNames = "sku"),
+				@UniqueConstraint(name = "uk_inventory_items_product_id", columnNames = "product_id")
+		},
 		indexes = {
 				@Index(name = "idx_inventory_items_active_sku", columnList = "active, sku"),
 				@Index(name = "idx_inventory_items_location", columnList = "location")
@@ -31,6 +34,9 @@ public class InventoryItem {
 	@Id
 	@GeneratedValue(strategy = GenerationType.UUID)
 	private UUID id;
+
+	@Column(name = "product_id")
+	private UUID productId;
 
 	@Column(nullable = false, length = 64)
 	private String sku;
@@ -67,6 +73,34 @@ public class InventoryItem {
 
 	public InventoryItem(InventoryItemRequest request) {
 		update(request);
+	}
+
+	public static InventoryItem fromProduct(UUID productId, String sku, BigDecimal price) {
+		InventoryItem item = new InventoryItem();
+		item.productId = productId;
+		item.sku = sku;
+		item.price = price == null ? BigDecimal.ZERO : price;
+		item.cost = BigDecimal.ZERO;
+		item.availableQuantity = 0;
+		item.reservedQuantity = 0;
+		item.active = true;
+		return item;
+	}
+
+	public void linkProduct(UUID catalogProductId) {
+		if (productId == null) {
+			productId = catalogProductId;
+		}
+	}
+
+	public void syncCatalog(String catalogSku, BigDecimal catalogPrice, boolean catalogActive) {
+		if (reservedQuantity == 0 || sku.equals(catalogSku)) {
+			sku = catalogSku;
+		}
+		if (catalogPrice != null) {
+			price = catalogPrice;
+		}
+		active = catalogActive;
 	}
 
 	public void update(InventoryItemRequest request) {
@@ -160,6 +194,10 @@ public class InventoryItem {
 
 	public UUID getId() {
 		return id;
+	}
+
+	public UUID getProductId() {
+		return productId;
 	}
 
 	public String getSku() {

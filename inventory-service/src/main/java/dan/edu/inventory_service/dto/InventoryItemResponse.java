@@ -6,6 +6,7 @@ import java.util.UUID;
 
 public record InventoryItemResponse(
 		UUID id,
+		UUID productId,
 		String sku,
 		BigDecimal price,
 		BigDecimal cost,

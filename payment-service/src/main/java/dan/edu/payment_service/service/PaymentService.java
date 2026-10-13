@@ -9,7 +9,9 @@ import dan.edu.payment_service.common.ResourceNotFoundException;
 import dan.edu.payment_service.dto.CreatePaymentRequest;
 import dan.edu.payment_service.dto.PaymentResponse;
 import dan.edu.payment_service.dto.SimulatePaymentRequest;
+import dan.edu.payment_service.event.OrderCreatedEvent;
 import dan.edu.payment_service.model.Payment;
+import dan.edu.payment_service.utils.enums.PaymentMethod;
 import dan.edu.payment_service.repository.PaymentRepository;
 import dan.edu.payment_service.utils.mapper.PaymentMapper;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +34,22 @@ public class PaymentService {
 		this.paymentRepository = paymentRepository;
 		this.paymentMapper = paymentMapper;
 		this.mockEnabled = mockEnabled;
+	}
+
+	@Transactional
+	public PaymentResponse createFromOrderCreated(OrderCreatedEvent event) {
+		if (event == null || event.orderId() == null || event.userId() == null
+				|| event.totalAmount() == null || event.currency() == null) {
+			return null;
+		}
+		return paymentRepository.findByOrderIdAndUserId(event.orderId(), event.userId())
+				.map(paymentMapper::toResponse)
+				.orElseGet(() -> create(event.userId(), new CreatePaymentRequest(
+						event.orderId(),
+						event.totalAmount(),
+						event.currency(),
+						PaymentMethod.CARD,
+						"order-created:" + event.orderId())));
 	}
 
 	@Transactional

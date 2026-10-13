@@ -19,6 +19,8 @@ import dan.edu.order_service.dto.OrderItemRequest;
 import dan.edu.order_service.dto.PaymentSnapshot;
 import dan.edu.order_service.dto.ProductSnapshot;
 import dan.edu.order_service.dto.StockReservationPayload;
+import dan.edu.order_service.event.OrderCreatedEvent;
+import dan.edu.order_service.event.OrderCreatedEventPublisher;
 import dan.edu.order_service.model.Order;
 import dan.edu.order_service.repository.OrderRepository;
 import dan.edu.order_service.utils.enums.OrderStatus;
@@ -37,14 +39,17 @@ public class OrderService {
 	private final OrderRepository orderRepository;
 	private final OrderMapper orderMapper;
 	private final OrderIntegrationClient integrations;
+	private final OrderCreatedEventPublisher orderCreatedEventPublisher;
 
 	public OrderService(
 			OrderRepository orderRepository,
 			OrderMapper orderMapper,
-			OrderIntegrationClient integrations) {
+			OrderIntegrationClient integrations,
+			OrderCreatedEventPublisher orderCreatedEventPublisher) {
 		this.orderRepository = orderRepository;
 		this.orderMapper = orderMapper;
 		this.integrations = integrations;
+		this.orderCreatedEventPublisher = orderCreatedEventPublisher;
 	}
 
 	@Transactional(readOnly = true)
@@ -78,8 +83,7 @@ public class OrderService {
 		Order order = orderRepository.save(new Order(userId, request, products));
 		try {
 			integrations.reserve(order.getId(), reservationItems(order));
-			integrations.enqueueNotification(notification(
-					order, "Order received", "Your order is pending payment.", "ORDER_PENDING"));
+			orderCreatedEventPublisher.publishAfterCommit(OrderCreatedEvent.from(order));
 			return orderMapper.toResponse(order);
 		} catch (RuntimeException exception) {
 			compensateReservation(order.getId(), exception);

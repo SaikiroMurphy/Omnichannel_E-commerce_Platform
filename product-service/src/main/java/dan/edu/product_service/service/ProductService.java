@@ -7,6 +7,8 @@ import dan.edu.product_service.common.ConflictException;
 import dan.edu.product_service.common.ResourceNotFoundException;
 import dan.edu.product_service.dto.ProductRequest;
 import dan.edu.product_service.dto.ProductResponse;
+import dan.edu.product_service.event.ProductCatalogEvent;
+import dan.edu.product_service.event.ProductCatalogEventPublisher;
 import dan.edu.product_service.model.Product;
 import dan.edu.product_service.repository.ProductRepository;
 import dan.edu.product_service.utils.mapper.ProductMapper;
@@ -20,10 +22,15 @@ public class ProductService {
 
 	private final ProductRepository productRepository;
 	private final ProductMapper productMapper;
+	private final ProductCatalogEventPublisher catalogEventPublisher;
 
-	public ProductService(ProductRepository productRepository, ProductMapper productMapper) {
+	public ProductService(
+			ProductRepository productRepository,
+			ProductMapper productMapper,
+			ProductCatalogEventPublisher catalogEventPublisher) {
 		this.productRepository = productRepository;
 		this.productMapper = productMapper;
+		this.catalogEventPublisher = catalogEventPublisher;
 	}
 
 	@Transactional(readOnly = true)
@@ -44,7 +51,9 @@ public class ProductService {
 		if (productRepository.existsBySkuIgnoreCase(sku)) {
 			throw new ConflictException("A product with this SKU already exists");
 		}
-		return productMapper.toResponse(productRepository.save(new Product(request)));
+		Product product = productRepository.save(new Product(request));
+		catalogEventPublisher.publishAfterCommit(ProductCatalogEvent.created(product));
+		return productMapper.toResponse(product);
 	}
 
 	@Transactional
@@ -55,7 +64,9 @@ public class ProductService {
 		if (productRepository.existsBySkuIgnoreCaseAndIdNot(sku, productId)) {
 			throw new ConflictException("A product with this SKU already exists");
 		}
+		String previousSku = product.getSku();
 		product.update(request);
+		catalogEventPublisher.publishAfterCommit(ProductCatalogEvent.updated(product, previousSku));
 		return productMapper.toResponse(product);
 	}
 
@@ -64,6 +75,7 @@ public class ProductService {
 		Product product = productRepository.findById(productId)
 				.orElseThrow(() -> new ResourceNotFoundException("Product not found"));
 		product.deactivate();
+		catalogEventPublisher.publishAfterCommit(ProductCatalogEvent.deactivated(product));
 	}
 
 	@Transactional
@@ -71,6 +83,7 @@ public class ProductService {
 		Product product = productRepository.findById(productId)
 				.orElseThrow(() -> new ResourceNotFoundException("Product not found"));
 		product.activate();
+		catalogEventPublisher.publishAfterCommit(ProductCatalogEvent.activated(product));
 		return productMapper.toResponse(product);
 	}
 

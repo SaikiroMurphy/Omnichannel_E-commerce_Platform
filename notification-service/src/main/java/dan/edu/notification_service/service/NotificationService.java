@@ -16,6 +16,7 @@ import dan.edu.notification_service.common.ResourceNotFoundException;
 import dan.edu.notification_service.dto.NotificationPageResponse;
 import dan.edu.notification_service.dto.NotificationRequest;
 import dan.edu.notification_service.dto.NotificationResponse;
+import dan.edu.notification_service.event.OrderCreatedEvent;
 import dan.edu.notification_service.model.Notification;
 import dan.edu.notification_service.model.NotificationStatus;
 import dan.edu.notification_service.repository.NotificationRepository;
@@ -70,6 +71,23 @@ public class NotificationService {
 		Notification notification = notificationRepository.findByIdAndUserId(notificationId, userId)
 				.orElseThrow(() -> new ResourceNotFoundException("Notification not found for userId=" + userId + " and id=" + notificationId));
 		return notificationMapper.toResponse(notification);
+	}
+
+	@Transactional
+	public NotificationResponse notifyOrderCreated(OrderCreatedEvent event) {
+		if (event == null || event.orderId() == null || event.userId() == null) {
+			return null;
+		}
+		String amount = event.totalAmount() == null ? "" : event.totalAmount().toPlainString();
+		String currency = event.currency() == null ? "" : event.currency();
+		return createNotification(new NotificationRequest(
+				event.userId(),
+				"Order confirmation",
+				"Your order %s totaling %s %s has been placed successfully and is pending payment."
+						.formatted(event.orderId(), amount, currency).trim(),
+				"EMAIL",
+				"ORDER_CREATED",
+				event.orderId().toString()));
 	}
 
 	@Transactional

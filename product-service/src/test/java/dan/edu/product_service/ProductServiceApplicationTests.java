@@ -2,6 +2,7 @@ package dan.edu.product_service;
 
 import java.util.UUID;
 
+import dan.edu.product_service.event.ProductCatalogEventPublisher;
 import dan.edu.product_service.repository.ProductRepository;
 import dan.edu.product_service.service.CloudinaryImageService;
 
@@ -26,6 +27,8 @@ import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -46,7 +49,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 		"spring.jpa.hibernate.ddl-auto=create-drop",
 		"product.jwt.issuer=http://user-service:8080",
 		"product.jwt.audience=quickbite-api",
-		"product.jwt.secret-base64=dXNlci1zZXJ2aWNlLXRlc3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE="
+		"product.jwt.secret-base64=dXNlci1zZXJ2aWNlLXRlc3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=",
+		"spring.kafka.bootstrap-servers=localhost:9092",
+		"product.kafka.topic=product.catalog.events"
 })
 @AutoConfigureMockMvc
 class ProductServiceApplicationTests {
@@ -69,6 +74,9 @@ class ProductServiceApplicationTests {
 	// Mock Cloudinary so CI/CD does not upload real images.
 	@MockitoBean
 	private CloudinaryImageService cloudinaryImageService;
+
+	@MockitoBean
+	private ProductCatalogEventPublisher catalogEventPublisher;
 
 	@BeforeEach
 	void setUp() {
@@ -216,6 +224,7 @@ class ProductServiceApplicationTests {
 		JsonNode response = objectMapper.readTree(
 				result.getResponse().getContentAsString());
 
+		verify(catalogEventPublisher, atLeastOnce()).publishAfterCommit(any());
 		return response.path("id").asText();
 	}
 

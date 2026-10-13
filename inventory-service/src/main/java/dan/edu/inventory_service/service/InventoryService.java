@@ -1,11 +1,14 @@
 package dan.edu.inventory_service.service;
 
+import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 import dan.edu.inventory_service.common.ConflictException;
 import dan.edu.inventory_service.common.ResourceNotFoundException;
 import dan.edu.inventory_service.dto.InventoryItemRequest;
 import dan.edu.inventory_service.dto.InventoryItemResponse;
+import dan.edu.inventory_service.event.ProductCatalogEvent;
 import dan.edu.inventory_service.model.InventoryItem;
 import dan.edu.inventory_service.repository.InventoryItemRepository;
 import dan.edu.inventory_service.utils.mapper.InventoryMapper;
@@ -42,6 +45,33 @@ public class InventoryService {
 		String normalizedSku = normalizeSku(sku);
 		return inventoryMapper.toResponse(inventoryItemRepository.findBySkuIgnoreCase(normalizedSku)
 				.orElseThrow(() -> new ResourceNotFoundException("Inventory item not found")));
+	}
+
+	@Transactional
+	public void applyProductCatalog(ProductCatalogEvent event) {
+		if (event == null || event.productId() == null || event.sku() == null || event.sku().isBlank()) {
+			return;
+		}
+
+		String sku = normalizeSku(event.sku());
+		InventoryItem item = findLinkedItem(event, sku).orElse(null);
+		String type = event.type() == null ? "" : event.type().trim().toUpperCase(Locale.ROOT);
+
+		switch (type) {
+			case ProductCatalogEvent.CREATED, ProductCatalogEvent.UPDATED -> upsertFromCatalog(item, event, sku);
+			case ProductCatalogEvent.DEACTIVATED -> {
+				if (item != null) {
+					item.deactivate();
+				}
+			}
+			case ProductCatalogEvent.ACTIVATED -> {
+				if (item != null) {
+					item.activate();
+				}
+			}
+			default -> {
+			}
+		}
 	}
 
 	@Transactional
@@ -116,7 +146,38 @@ public class InventoryService {
 		return value == null || value.isBlank() ? null : value.trim();
 	}
 
+	private Optional<InventoryItem> findLinkedItem(ProductCatalogEvent event, String sku) {
+		Optional<InventoryItem> byProduct = inventoryItemRepository.findByProductId(event.productId());
+		if (byProduct.isPresent()) {
+			return byProduct;
+		}
+		Optional<InventoryItem> bySku = inventoryItemRepository.findBySkuIgnoreCase(sku);
+		if (bySku.isPresent()) {
+			return bySku;
+		}
+		if (event.previousSku() == null || event.previousSku().isBlank()) {
+			return Optional.empty();
+		}
+		return inventoryItemRepository.findBySkuIgnoreCase(normalizeSku(event.previousSku()));
+	}
+
+	private void upsertFromCatalog(InventoryItem item, ProductCatalogEvent event, String sku) {
+		if (item == null) {
+			inventoryItemRepository.save(InventoryItem.fromProduct(event.productId(), sku, event.price()));
+			return;
+		}
+		if (item.getProductId() != null && !item.getProductId().equals(event.productId())) {
+			if (inventoryItemRepository.findByProductId(event.productId()).isEmpty()
+					&& !inventoryItemRepository.existsBySkuIgnoreCase(sku)) {
+				inventoryItemRepository.save(InventoryItem.fromProduct(event.productId(), sku, event.price()));
+			}
+			return;
+		}
+		item.linkProduct(event.productId());
+		item.syncCatalog(sku, event.price(), event.active());
+	}
+
 	private static String normalizeSku(String sku) {
-		return sku.trim().toUpperCase();
+		return sku.trim().toUpperCase(Locale.ROOT);
 	}
 }
