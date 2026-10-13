@@ -1,15 +1,19 @@
 package dan.edu.product_service.common;
 
 import java.net.URI;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import jakarta.validation.ConstraintViolationException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -18,6 +22,24 @@ public class ApiExceptionHandler {
 	ProblemDetail handleNotFound(ResourceNotFoundException exception) {
 		return problem(HttpStatus.NOT_FOUND, "Resource not found", exception.getMessage());
 	}
+
+	@ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleConstraintViolation(
+            ConstraintViolationException ex) {
+
+        var errors = ex.getConstraintViolations()
+                .stream()
+                .map(v -> v.getPropertyPath() + ": " + v.getMessage())
+                .collect(Collectors.toList());
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                        "status", 400,
+                        "error", "Validation failed",
+                        "details", errors
+                ));
+    }
 
 	@ExceptionHandler({ConflictException.class, DataIntegrityViolationException.class})
 	ProblemDetail handleConflict(Exception exception) {
