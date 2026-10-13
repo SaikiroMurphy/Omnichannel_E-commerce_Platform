@@ -245,6 +245,7 @@ services:
       JWT_AUDIENCE: ${JWT_AUDIENCE:-quickbite-api}
       JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:-}
       PRODUCT_SERVICE_URL: http://product-service:8080
+      PRODUCT_GRPC_TARGET: product-service:9090
       INVENTORY_SERVICE_URL: http://inventory-service:8080
       PAYMENT_SERVICE_URL: http://payment-service:8080
       NOTIFICATION_SERVICE_URL: http://notification-service:8080

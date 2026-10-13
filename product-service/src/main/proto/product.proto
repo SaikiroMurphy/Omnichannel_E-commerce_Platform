@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package dan.edu.grpc.product;
+
+option java_multiple_files = true;
+option java_package = "dan.edu.grpc.product";
+option java_outer_classname = "ProductProto";
+
+service ProductQuery {
+  rpc GetProduct (GetProductRequest) returns (ProductReply);
+}
+
+message GetProductRequest {
+  string product_id = 1;
+}
+
+message ProductReply {
+  string id = 1;
+  string sku = 2;
+  string name = 3;
+  // Decimal string, e.g. "19.90", to avoid floating point loss.
+  string price = 4;
+  string currency = 5;
+  bool active = 6;
+}

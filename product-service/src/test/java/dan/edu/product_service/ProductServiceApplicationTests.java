@@ -51,7 +51,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 		"product.jwt.audience=quickbite-api",
 		"product.jwt.secret-base64=dXNlci1zZXJ2aWNlLXRlc3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=",
 		"spring.kafka.bootstrap-servers=localhost:9092",
-		"product.kafka.topic=product.catalog.events"
+		"product.kafka.topic=product.catalog.events",
+		"product.grpc.port=0"
 })
 @AutoConfigureMockMvc
 class ProductServiceApplicationTests {
