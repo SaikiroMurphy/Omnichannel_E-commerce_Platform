@@ -251,6 +251,7 @@ services:
       NOTIFICATION_SERVICE_URL: http://notification-service:8080
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
       ORDER_CREATED_TOPIC: order.created
+      PAYMENT_RESULT_TOPIC: payment.result
     ports:
       - "8083:8080"
     depends_on:
@@ -323,10 +324,10 @@ services:
       JWT_ISSUER_URI: ${JWT_ISSUER_URI:-http://user-service:8080}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-quickbite-api}
       JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:-}
-      ORDER_SERVICE_URL: http://order-service:8080
       PAYMENT_MOCK_ENABLED: ${PAYMENT_MOCK_ENABLED:-true}
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
       ORDER_CREATED_TOPIC: order.created
+      PAYMENT_RESULT_TOPIC: payment.result
     ports:
       - "8085:8080"
     depends_on:

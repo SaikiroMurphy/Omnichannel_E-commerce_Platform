@@ -205,10 +205,14 @@ services:
       DB_USERNAME: postgres
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       <<: *jwt-env
-      ORDER_SERVICE_URL: http://order-service:8080
       PAYMENT_MOCK_ENABLED: ${PAYMENT_MOCK_ENABLED:-true}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      ORDER_CREATED_TOPIC: order.created
+      PAYMENT_RESULT_TOPIC: payment.result
     depends_on:
       payment-db:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     healthcheck: *java-healthcheck
 
@@ -261,8 +265,13 @@ services:
       INVENTORY_SERVICE_URL: http://inventory-service:8080
       PAYMENT_SERVICE_URL: http://payment-service:8080
       NOTIFICATION_SERVICE_URL: http://notification-service:8080
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      ORDER_CREATED_TOPIC: order.created
+      PAYMENT_RESULT_TOPIC: payment.result
     depends_on:
       order-db:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
       product-service:
         condition: service_healthy
