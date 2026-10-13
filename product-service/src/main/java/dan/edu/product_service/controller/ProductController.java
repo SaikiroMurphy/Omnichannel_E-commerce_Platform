@@ -1,5 +1,6 @@
 package dan.edu.product_service.controller;
 
+import java.util.Set;
 import java.util.UUID;
 
 import dan.edu.product_service.dto.ProductPageResponse;
@@ -8,7 +9,13 @@ import dan.edu.product_service.dto.ProductResponse;
 import dan.edu.product_service.service.CloudinaryImageService;
 import dan.edu.product_service.service.ProductService;
 import dan.edu.product_service.utils.mapper.ProductMapper;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
+import jakarta.validation.Validator;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
@@ -34,11 +41,15 @@ public class ProductController {
 	private final ProductService productService;
 	private final ProductMapper productMapper;
 	private final CloudinaryImageService cloudinaryImageService;
+	private final ObjectMapper objectMapper;
+	private final Validator validator;
 
-	public ProductController(ProductService productService, ProductMapper productMapper, CloudinaryImageService cloudinaryImageService) {
+	public ProductController(ProductService productService, ProductMapper productMapper, CloudinaryImageService cloudinaryImageService, ObjectMapper objectMapper, Validator validator) {
 		this.productService = productService;
 		this.productMapper = productMapper;
 		this.cloudinaryImageService = cloudinaryImageService;
+		this.objectMapper = objectMapper;
+		this.validator = validator;
 	}
 
 	@GetMapping
@@ -60,8 +71,20 @@ public class ProductController {
 	@PreAuthorize("hasAuthority('ROLE_ADMIN')")
 	@ResponseStatus(HttpStatus.CREATED)
 	public ProductResponse create(
-			@Valid @RequestPart("product") ProductRequest request,
-			@RequestPart("image") MultipartFile image) {
+			@RequestPart("product") String productJson,
+			@RequestPart("image") MultipartFile image)
+			throws JacksonException {
+
+		ProductRequest request =
+				objectMapper.readValue(productJson, ProductRequest.class);
+
+		// Kiểm tra validation sau khi parse JSON.
+		Set<ConstraintViolation<ProductRequest>> violations =
+				validator.validate(request);
+
+		if (!violations.isEmpty()) {
+			throw new ConstraintViolationException(violations);
+		}
 
 		String imageUrl = cloudinaryImageService.uploadImage(image);
 
@@ -77,7 +100,6 @@ public class ProductController {
 
 		return productService.create(requestWithImage);
 	}
-
 	@PutMapping("/{productId}")
 	@PreAuthorize("hasAuthority('ROLE_ADMIN')")
 	public ProductResponse update(
