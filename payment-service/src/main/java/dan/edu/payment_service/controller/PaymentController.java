@@ -6,7 +6,6 @@ import dan.edu.payment_service.dto.CreatePaymentRequest;
 import dan.edu.payment_service.dto.InternalCreatePaymentRequest;
 import dan.edu.payment_service.dto.PaymentResponse;
 import dan.edu.payment_service.dto.SimulatePaymentRequest;
-import dan.edu.payment_service.service.OrderPaymentEventPublisher;
 import dan.edu.payment_service.service.PaymentService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -32,13 +31,10 @@ import org.springframework.web.bind.annotation.RestController;
 public class PaymentController {
 
 	private final PaymentService paymentService;
-	private final OrderPaymentEventPublisher orderPaymentEventPublisher;
 
 	public PaymentController(
-			PaymentService paymentService,
-			OrderPaymentEventPublisher orderPaymentEventPublisher) {
+			PaymentService paymentService) {
 		this.paymentService = paymentService;
-		this.orderPaymentEventPublisher = orderPaymentEventPublisher;
 	}
 
 	@PostMapping("/internal")
@@ -98,18 +94,14 @@ public class PaymentController {
 			@AuthenticationPrincipal Jwt jwt,
 			@PathVariable UUID paymentId,
 			@Valid @RequestBody SimulatePaymentRequest request) {
-		PaymentResponse payment = paymentService.simulate(userId(jwt), paymentId, request);
-			orderPaymentEventPublisher.publish(payment, userId(jwt));
-		return payment;
+		return paymentService.simulate(userId(jwt), paymentId, request);
 	}
 
 	@PostMapping("/{paymentId}/cancel")
 	public PaymentResponse cancel(
 			@AuthenticationPrincipal Jwt jwt,
 			@PathVariable UUID paymentId) {
-		PaymentResponse payment = paymentService.cancel(userId(jwt), paymentId);
-			orderPaymentEventPublisher.publish(payment, userId(jwt));
-		return payment;
+		return paymentService.cancel(userId(jwt), paymentId);
 	}
 
 	@PostMapping("/{paymentId}/refund")

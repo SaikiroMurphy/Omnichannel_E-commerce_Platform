@@ -3,7 +3,7 @@ package dan.edu.payment_service;
 import java.util.UUID;
 
 import dan.edu.payment_service.repository.PaymentRepository;
-import dan.edu.payment_service.service.OrderPaymentEventPublisher;
+import dan.edu.payment_service.event.OutboxEventRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +33,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 		"payment.jwt.issuer=http://user-service:8080",
 		"payment.jwt.audience=quickbite-api",
 		"payment.jwt.secret-base64=dXNlci1zZXJ2aWNlLXRlc3Qtc2VjcmV0LWtleS0zMi1ieXRlcyE=",
-		"payment.mock.enabled=true"
+		"payment.mock.enabled=true",
+		"payment.kafka.payment-result-topic=payment.result",
+		"payment.outbox.poll-interval-ms=3600000"
 })
 @AutoConfigureMockMvc
 class PaymentServiceApplicationTests {
@@ -52,12 +54,13 @@ class PaymentServiceApplicationTests {
 	@Autowired
 	private ObjectMapper objectMapper;
 
-	@MockitoBean
-	private OrderPaymentEventPublisher orderPaymentEventPublisher;
+	@Autowired
+	private OutboxEventRepository outboxRepository;
 
 	@BeforeEach
 	void clearPayments() {
 		paymentRepository.deleteAll();
+		outboxRepository.deleteAll();
 	}
 
 	@Test
@@ -116,9 +119,10 @@ class PaymentServiceApplicationTests {
 						.content("{\"outcome\":\"APPROVED\"}"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("SUCCEEDED"));
-		verify(orderPaymentEventPublisher).publish(
-				org.mockito.ArgumentMatchers.argThat(payment -> payment.status().name().equals("SUCCEEDED")),
-				eq(USER_ID));
+		assertThat(outboxRepository.findAll()).singleElement().satisfies(event -> {
+			assertThat(event.getTopic()).isEqualTo("payment.result");
+			assertThat(event.getPayload()).contains("SUCCEEDED");
+		});
 
 		mockMvc.perform(post("/api/payments/{paymentId}/refund", paymentId)
 						.with(jwt().jwt(token -> token.subject(USER_ID.toString()))))

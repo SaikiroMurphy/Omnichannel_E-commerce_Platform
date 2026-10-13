@@ -25,14 +25,17 @@ public class PaymentService {
 
 	private final PaymentRepository paymentRepository;
 	private final PaymentMapper paymentMapper;
+	private final OrderPaymentEventPublisher orderPaymentEventPublisher;
 	private final boolean mockEnabled;
 
 	public PaymentService(
 			PaymentRepository paymentRepository,
 			PaymentMapper paymentMapper,
+			OrderPaymentEventPublisher orderPaymentEventPublisher,
 			@Value("${payment.mock.enabled:false}") boolean mockEnabled) {
 		this.paymentRepository = paymentRepository;
 		this.paymentMapper = paymentMapper;
+		this.orderPaymentEventPublisher = orderPaymentEventPublisher;
 		this.mockEnabled = mockEnabled;
 	}
 
@@ -95,14 +98,18 @@ public class PaymentService {
 		}
 		Payment payment = findOwnedPaymentForUpdate(paymentId, userId);
 		payment.simulate(request.outcome());
-		return paymentMapper.toResponse(payment);
+		PaymentResponse response = paymentMapper.toResponse(payment);
+		orderPaymentEventPublisher.publish(response, userId);
+		return response;
 	}
 
 	@Transactional
 	public PaymentResponse cancel(UUID userId, UUID paymentId) {
 		Payment payment = findOwnedPaymentForUpdate(paymentId, userId);
 		payment.cancel();
-		return paymentMapper.toResponse(payment);
+		PaymentResponse response = paymentMapper.toResponse(payment);
+		orderPaymentEventPublisher.publish(response, userId);
+		return response;
 	}
 
 	@Transactional
