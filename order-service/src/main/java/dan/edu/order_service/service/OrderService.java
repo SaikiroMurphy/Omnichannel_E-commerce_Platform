@@ -83,7 +83,7 @@ public class OrderService {
 		Order order = orderRepository.save(new Order(userId, request, products));
 		try {
 			integrations.reserve(order.getId(), reservationItems(order));
-			orderCreatedEventPublisher.publishAfterCommit(OrderCreatedEvent.from(order));
+			orderCreatedEventPublisher.publish(OrderCreatedEvent.from(order));
 			return orderMapper.toResponse(order);
 		} catch (RuntimeException exception) {
 			compensateReservation(order.getId(), exception);

@@ -27,8 +27,8 @@ public class OrderCreatedEventListener {
 		try {
 			event = objectMapper.readValue(payload, OrderCreatedEvent.class);
 		} catch (Exception error) {
-			log.error("Ignoring malformed OrderCreatedEvent: {}", payload, error);
-			return;
+			log.error("Malformed OrderCreatedEvent sent to DLT: {}", payload, error);
+			throw new MalformedOrderCreatedEventException("Malformed OrderCreatedEvent", error);
 		}
 		notificationService.notifyOrderCreated(event);
 	}
