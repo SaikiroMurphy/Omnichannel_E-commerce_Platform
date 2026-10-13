@@ -27,8 +27,8 @@ public class ProductCatalogEventListener {
 		try {
 			event = objectMapper.readValue(payload, ProductCatalogEvent.class);
 		} catch (Exception error) {
-			log.error("Ignoring malformed product catalog event: {}", payload, error);
-			return;
+			log.error("Malformed product catalog event sent to DLT: {}", payload, error);
+			throw new MalformedProductCatalogEventException("Malformed product catalog event", error);
 		}
 		inventoryService.applyProductCatalog(event);
 	}

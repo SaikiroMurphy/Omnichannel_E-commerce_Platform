@@ -224,7 +224,7 @@ class ProductServiceApplicationTests {
 		JsonNode response = objectMapper.readTree(
 				result.getResponse().getContentAsString());
 
-		verify(catalogEventPublisher, atLeastOnce()).publishAfterCommit(any());
+		verify(catalogEventPublisher, atLeastOnce()).publish(any());
 		return response.path("id").asText();
 	}
 
