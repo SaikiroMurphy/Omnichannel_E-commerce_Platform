@@ -98,7 +98,7 @@ public class GatewaySecurityConfiguration {
 				.csrf(ServerHttpSecurity.CsrfSpec::disable)
 				.authorizeExchange(exchange -> exchange
 						.pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-						.pathMatchers("/actuator/health", "/actuator/health/**").permitAll()
+						.pathMatchers("/actuator/health", "/actuator/health/**", "/actuator/prometheus").permitAll()
 						.pathMatchers(HttpMethod.POST,
 								"/api/auth/login",
 								"/api/auth/register",
